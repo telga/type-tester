@@ -75,13 +75,18 @@
           
           <p class="font-mono text-center max-h-[35vh] overflow-y-auto">
             <span
-              v-for="(char, index) in text"
+              v-for="(char, index) in displayText"
               :key="index"
               :class="{
-                'text-nord14 transition-colors duration-150': index < currentIndex && typedText[index] === char,
-                'text-nord11 transition-colors duration-150': index < currentIndex && typedText[index] !== char,
+                'text-nord14 transition-colors duration-150': selectedLanguage === 'ja' 
+                  ? (getJapaneseCharStatus(index) === 'correct')
+                  : (index < currentIndex && typedText[index] === char),
+                'text-nord11 transition-colors duration-150': selectedLanguage === 'ja'
+                  ? (getJapaneseCharStatus(index) === 'incorrect')
+                  : (index < currentIndex && typedText[index] !== char),
                 'bg-nord2 animate-cursor': index === currentIndex && !testComplete,
-                'text-nord4': index > currentIndex
+                'text-nord4': index > currentIndex,
+                'select-none pointer-events-none opacity-50': selectedLanguage === 'ja' && char === ' '
               }"
             >{{ char }}</span>
           </p>
@@ -146,7 +151,8 @@ const handleEnterKey = (e) => {
 }
 
 const loadNewWords = async () => {
-  text.value = await generateWords(selectedWordCount.value, selectedLanguage.value)
+  const rawText = await generateWords(selectedWordCount.value, selectedLanguage.value)
+  text.value = rawText
 }
 
 const calculateResults = () => {
@@ -154,20 +160,22 @@ const calculateResults = () => {
   accuracy.value = calculateAccuracy()
   
   if (selectedLanguage.value === 'en') {
-    // For English: (characters typed / 5) / minutes
     const totalChars = text.value.length
     const charactersPerSecond = totalChars / timeInSeconds
     const rawWpm = Math.round((charactersPerSecond * 60) / 5)
-    // Show 0 WPM if accuracy is under 60%
     wpm.value = accuracy.value < 60 ? 0 : rawWpm
   } else {
-    // For Japanese: only count correctly typed characters
+    // For Japanese: only count non-space characters
+    const textWithoutSpaces = text.value.replace(/\s+/g, '')
+    const typedWithoutSpaces = typedText.value.replace(/\s+/g, '')
     let correctChars = 0
-    for (let i = 0; i < typedText.value.length; i++) {
-      if (typedText.value[i] === text.value[i]) {
+    
+    for (let i = 0; i < typedWithoutSpaces.length; i++) {
+      if (typedWithoutSpaces[i] === textWithoutSpaces[i]) {
         correctChars++
       }
     }
+    
     const charactersPerSecond = correctChars / timeInSeconds
     wpm.value = Math.round((charactersPerSecond * 60) / 5)
   }
@@ -176,16 +184,31 @@ const calculateResults = () => {
 const calculateAccuracy = () => {
   if (currentIndex.value === 0) return 0
   
-  const totalChars = text.value.length
-  let correctChars = 0
-  
-  for (let i = 0; i < totalChars && i < typedText.value.length; i++) {
-    if (typedText.value[i] === text.value[i]) {
-      correctChars++
+  if (selectedLanguage.value === 'ja') {
+    const textWithoutSpaces = text.value.replace(/\s+/g, '')
+    const typedWithoutSpaces = typedText.value.replace(/\s+/g, '')
+    let correctChars = 0
+    const totalChars = textWithoutSpaces.length
+    
+    for (let i = 0; i < totalChars && i < typedWithoutSpaces.length; i++) {
+      if (typedWithoutSpaces[i] === textWithoutSpaces[i]) {
+        correctChars++
+      }
     }
+    
+    return Math.round((correctChars / totalChars) * 100)
+  } else {
+    const totalChars = text.value.length
+    let correctChars = 0
+    
+    for (let i = 0; i < totalChars && i < typedText.value.length; i++) {
+      if (typedText.value[i] === text.value[i]) {
+        correctChars++
+      }
+    }
+    
+    return Math.round((correctChars / totalChars) * 100)
   }
-  
-  return Math.round((correctChars / totalChars) * 100)
 }
 
 const handleFocus = (e) => {
@@ -201,9 +224,15 @@ const handleKeyPress = (e) => {
     return
   }
 
+  // Prevent spacebar input in Japanese mode
+  if (selectedLanguage.value === 'ja' && e.key === ' ') {
+    e.preventDefault()
+    return
+  }
+
   // Handle English typing directly through keyPress
   if (selectedLanguage.value === 'en' && !isComposing.value) {
-    if (e.key.length === 1) { // Regular character
+    if (e.key.length === 1) {
       e.preventDefault()
       if (!testStarted.value && e.key === text.value[0]) {
         testStarted.value = true
@@ -262,18 +291,24 @@ const handleCompositionStart = () => {
 const handleCompositionEnd = (e) => {
   isComposing.value = false
   if (e.data && selectedLanguage.value === 'ja') {
-    // Start the test if this is the first character
     if (!testStarted.value) {
       testStarted.value = true
       startTime.value = Date.now()
     }
     
+    // Add the character and skip any spaces
     typedText.value += e.data
     currentIndex.value += e.data.length
+    
+    // Skip any spaces in the display text
+    while (displayText.value[currentIndex.value] === ' ') {
+      currentIndex.value++
+    }
+    
     inputValue.value = ''
     
-    // Check if we've reached or exceeded the target length
-    if (typedText.value.length >= text.value.length) {
+    // Check if we've reached the end
+    if (currentIndex.value >= displayText.value.length) {
       testComplete.value = true
       calculateResults()
     }
@@ -287,7 +322,6 @@ const handleInput = (e) => {
   if (selectedLanguage.value === 'ja' && !isComposing.value) {
     const input = inputValue.value
     if (input.length > 0) {
-      // Start the test if this is the first character
       if (!testStarted.value) {
         testStarted.value = true
         startTime.value = Date.now()
@@ -295,10 +329,15 @@ const handleInput = (e) => {
       
       typedText.value += input
       currentIndex.value += input.length
+      
+      // Skip any spaces in the display text
+      while (displayText.value[currentIndex.value] === ' ') {
+        currentIndex.value++
+      }
+      
       inputValue.value = ''
       
-      // Check if we've reached or exceeded the target length
-      if (typedText.value.length >= text.value.length) {
+      if (currentIndex.value >= displayText.value.length) {
         testComplete.value = true
         calculateResults()
       }
@@ -317,6 +356,41 @@ onMounted(async () => {
     }
   })
 })
+
+// Add this computed property
+const displayText = computed(() => {
+  if (selectedLanguage.value === 'ja') {
+    // Split into words (assuming words are space-separated)
+    const words = text.value.split(' ')
+    // Add visual spaces between characters within each word
+    return words.map(word => word.split('').join('')).join(' ')
+  }
+  return text.value
+})
+
+// Create a new computed property for the actual text to type
+const actualText = computed(() => {
+  if (selectedLanguage.value === 'ja') {
+    // Remove spaces only for Japanese mode
+    return text.value.replace(/\s+/g, '')
+  }
+  return text.value
+})
+
+// Add this helper function
+const getJapaneseCharStatus = (displayIndex) => {
+  // Convert display index to actual index by removing spaces before this position
+  const textUpToIndex = displayText.value.slice(0, displayIndex)
+  const actualIndex = textUpToIndex.replace(/\s/g, '').length
+  
+  if (actualIndex >= typedText.value.length) return 'pending'
+  
+  const char = displayText.value[displayIndex]
+  if (char === ' ') return 'space'
+  
+  const actualChar = text.value.replace(/\s/g, '')[actualIndex]
+  return typedText.value[actualIndex] === actualChar ? 'correct' : 'incorrect'
+}
 </script>
 
 <style>
