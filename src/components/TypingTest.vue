@@ -31,7 +31,7 @@
 
       <div v-if="testComplete" class="animate-slide-up">
         <Stats :wpm="wpm" :accuracy="accuracy" />
-        <span v-if="accuracy < 70" 
+        <span v-if="selectedLanguage === 'en' && accuracy < 60" 
               class="text-nord11 text-sm text-center block mt-2 animate-fade-in">
           invalid: ur cheating or ur really bad at typing
         </span>
@@ -40,12 +40,22 @@
       <!-- Main typing area -->
       <div class="w-full max-w-2xl px-4">
         <div 
-          class="w-full text-2xl leading-relaxed focus:outline-none"
-          @keydown="handleKeyPress"
-          tabindex="0"
-          ref="textContainer"
+          class="w-full text-2xl leading-relaxed focus:outline-none relative"
           :class="{'opacity-50 transition-opacity duration-300': testComplete}"
         >
+          <!-- Add hidden input field for IME -->
+          <input
+            type="text"
+            ref="textContainer"
+            v-model="inputValue"
+            @input="handleInput"
+            @keydown="handleKeyPress"
+            @compositionstart="handleCompositionStart"
+            @compositionend="handleCompositionEnd"
+            class="opacity-0 absolute top-0 left-0 h-full w-full cursor-default"
+            :disabled="testComplete"
+          />
+          
           <p class="font-mono text-center max-h-[35vh] overflow-y-auto">
             <span
               v-for="(char, index) in text"
@@ -88,6 +98,8 @@ const testStarted = ref(false)
 const testComplete = ref(false)
 const startTime = ref(null)
 const textContainer = ref(null)
+const isComposing = ref(false)
+const inputValue = ref('')
 
 const wpm = ref(0)
 const accuracy = ref(100)
@@ -116,16 +128,34 @@ const loadNewWords = async () => {
 
 const calculateResults = () => {
   const timeInMinutes = (Date.now() - startTime.value) / 60000
-  const wordsTyped = text.value.split(' ').length
-  const rawWpm = Math.round(wordsTyped / timeInMinutes)
+  accuracy.value = calculateAccuracy()
   
-  const totalChars = currentIndex.value
-  const correctChars = Array.from(typedText.value).reduce((acc, char, i) => {
-    return acc + (char === text.value[i] ? 1 : 0)
-  }, 0)
+  if (selectedLanguage.value === 'en') {
+    const wordsTyped = text.value.split(' ').length
+    const rawWpm = Math.round(wordsTyped / timeInMinutes)
+    // For English: show 0 WPM if accuracy is under 60%
+    wpm.value = accuracy.value < 60 ? 0 : rawWpm
+  } else {
+    // For Japanese: show WPM regardless of accuracy
+    const characterCount = text.value.length
+    const effectiveWords = characterCount / 2
+    wpm.value = Math.round(effectiveWords / timeInMinutes)
+  }
+}
+
+const calculateAccuracy = () => {
+  if (currentIndex.value === 0) return 0
   
-  accuracy.value = Math.round((correctChars / totalChars) * 100)
-  wpm.value = accuracy.value >= 70 ? rawWpm : 0
+  const totalChars = text.value.length
+  let correctChars = 0
+  
+  for (let i = 0; i < totalChars && i < typedText.value.length; i++) {
+    if (typedText.value[i] === text.value[i]) {
+      correctChars++
+    }
+  }
+  
+  return Math.round((correctChars / totalChars) * 100)
 }
 
 const handleFocus = (e) => {
@@ -141,30 +171,28 @@ const handleKeyPress = (e) => {
     return
   }
 
-  if (e.key === 'Tab') {
-    return
-  }
-
-  if (e.key === text.value[0] && !testStarted.value) {
-    testStarted.value = true
-    startTime.value = Date.now()
+  // Handle English typing directly through keyPress
+  if (selectedLanguage.value === 'en' && !isComposing.value) {
+    if (e.key.length === 1) { // Regular character
+      e.preventDefault()
+      if (!testStarted.value && e.key === text.value[0]) {
+        testStarted.value = true
+        startTime.value = Date.now()
+      }
+      typedText.value += e.key
+      currentIndex.value++
+    }
   }
 
   if (e.key === 'Backspace' && currentIndex.value > 0) {
+    e.preventDefault()
     typedText.value = typedText.value.slice(0, -1)
     currentIndex.value--
-  } else if (e.key.length === 1) {
-    typedText.value += e.key
-    currentIndex.value++
   }
 
   if (currentIndex.value === text.value.length) {
     testComplete.value = true
     calculateResults()
-  }
-
-  if (e.key !== 'Tab') {
-    e.preventDefault()
   }
 }
 
@@ -177,6 +205,7 @@ const resetTest = async () => {
   startTime.value = null
   wpm.value = 0
   accuracy.value = 100
+  inputValue.value = ''
   textContainer.value?.focus()
 }
 
@@ -194,6 +223,56 @@ const handleLanguageChange = () => {
   resetTest()
 }
 
+const handleCompositionStart = () => {
+  isComposing.value = true
+}
+
+const handleCompositionEnd = (e) => {
+  isComposing.value = false
+  if (e.data && selectedLanguage.value === 'ja') {
+    // Start the test if this is the first character
+    if (!testStarted.value) {
+      testStarted.value = true
+      startTime.value = Date.now()
+    }
+    
+    typedText.value += e.data
+    currentIndex.value += e.data.length
+    inputValue.value = ''
+    
+    if (currentIndex.value === text.value.length) {
+      testComplete.value = true
+      calculateResults()
+    }
+  }
+}
+
+// Update or add these handlers
+const handleInput = (e) => {
+  if (testComplete.value) return
+  
+  if (selectedLanguage.value === 'ja' && !isComposing.value) {
+    const input = inputValue.value
+    if (input.length > 0) {
+      // Start the test if this is the first character
+      if (!testStarted.value) {
+        testStarted.value = true
+        startTime.value = Date.now()
+      }
+      
+      typedText.value += input
+      currentIndex.value += input.length
+      inputValue.value = ''
+      
+      if (currentIndex.value === text.value.length) {
+        testComplete.value = true
+        calculateResults()
+      }
+    }
+  }
+}
+
+// Make sure to update onMounted to focus the input
 onMounted(async () => {
   await loadNewWords()
   textContainer.value?.focus()
