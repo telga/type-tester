@@ -84,7 +84,7 @@
                 'text-nord11 transition-colors duration-150': selectedLanguage === 'ja'
                   ? (getJapaneseCharStatus(index) === 'incorrect')
                   : (index < currentIndex && typedText[index] !== char),
-                'bg-nord2 animate-cursor': index === currentIndex && !testComplete,
+                'relative cursor-underline': index === currentIndex && !testComplete,
                 'text-nord4': index > currentIndex,
                 'select-none pointer-events-none opacity-50': selectedLanguage === 'ja' && char === ' '
               }"
@@ -394,7 +394,7 @@ const getJapaneseCharStatus = (displayIndex) => {
 </script>
 
 <style>
-@keyframes cursor {
+@keyframes cursorBlink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
@@ -409,8 +409,15 @@ const getJapaneseCharStatus = (displayIndex) => {
   to { opacity: 1; }
 }
 
-.animate-cursor {
-  animation: cursor 0.8s ease infinite;
+.cursor-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 2px;
+  background-color: #D8DEE9; /* nord4 color */
+  animation: cursorBlink 0.8s ease infinite;
 }
 
 .animate-slide-up {
