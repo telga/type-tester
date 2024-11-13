@@ -68,8 +68,9 @@
             @input="handleInput"
             @keydown="handleKeyPress"
             @compositionstart="handleCompositionStart"
+            @compositionupdate="handleCompositionUpdate"
             @compositionend="handleCompositionEnd"
-            class="opacity-0 absolute top-0 left-0 h-full w-full cursor-default"
+            class="absolute top-0 left-0 h-full w-full cursor-default bg-transparent text-transparent outline-none focus:outline-none focus:ring-0"
             :disabled="testComplete"
           />
           
@@ -89,6 +90,10 @@
                 'select-none pointer-events-none opacity-50': selectedLanguage === 'ja' && char === ' '
               }"
             >{{ getDisplayCharacter(char, index) }}</span>
+            <span 
+              v-if="selectedLanguage === 'ja' && isComposing" 
+              class="text-nord4"
+            >{{ inputValue }}</span>
           </p>
         </div>
       </div>
@@ -224,10 +229,18 @@ const handleKeyPress = (e) => {
     return
   }
 
-  // Prevent spacebar input in Japanese mode
+  // For Japanese: prevent space input completely
   if (selectedLanguage.value === 'ja' && e.key === ' ') {
     e.preventDefault()
     return
+  }
+
+  // For English: only allow space where expected
+  if (selectedLanguage.value === 'en' && e.key === ' ') {
+    if (text.value[currentIndex.value] !== ' ') {
+      e.preventDefault()
+      return
+    }
   }
 
   // Handle English typing directly through keyPress
@@ -284,30 +297,37 @@ const selectLanguage = (langCode) => {
   resetTest()
 }
 
-const handleCompositionStart = () => {
+const handleCompositionStart = (e) => {
   isComposing.value = true
+  inputValue.value = e.data || ''
+}
+
+const handleCompositionUpdate = (e) => {
+  if (selectedLanguage.value === 'ja') {
+    // Filter out spaces during IME composition
+    inputValue.value = (e.data || '').replace(/\s+/g, '')
+  }
 }
 
 const handleCompositionEnd = (e) => {
   isComposing.value = false
-  if (e.data && selectedLanguage.value === 'ja') {
+  if (selectedLanguage.value === 'ja') {
     if (!testStarted.value) {
       testStarted.value = true
       startTime.value = Date.now()
     }
     
-    // Add the character and skip any spaces
-    typedText.value += e.data
-    currentIndex.value += e.data.length
+    // Filter out spaces from the final input
+    const input = (e.data || '').replace(/\s+/g, '')
+    typedText.value += input
+    currentIndex.value += input.length
     
-    // Skip any spaces in the display text
     while (displayText.value[currentIndex.value] === ' ') {
       currentIndex.value++
     }
     
     inputValue.value = ''
     
-    // Check if we've reached the end
     if (currentIndex.value >= displayText.value.length) {
       testComplete.value = true
       calculateResults()
@@ -315,31 +335,35 @@ const handleCompositionEnd = (e) => {
   }
 }
 
-// Update or add these handlers
+// Update handleInput function
 const handleInput = (e) => {
   if (testComplete.value) return
   
-  if (selectedLanguage.value === 'ja' && !isComposing.value) {
-    const input = inputValue.value
-    if (input.length > 0) {
-      if (!testStarted.value) {
-        testStarted.value = true
-        startTime.value = Date.now()
-      }
-      
-      typedText.value += input
-      currentIndex.value += input.length
-      
-      // Skip any spaces in the display text
-      while (displayText.value[currentIndex.value] === ' ') {
-        currentIndex.value++
-      }
-      
-      inputValue.value = ''
-      
-      if (currentIndex.value >= displayText.value.length) {
-        testComplete.value = true
-        calculateResults()
+  if (selectedLanguage.value === 'ja') {
+    if (isComposing.value) {
+      // During IME composition, filter out spaces
+      inputValue.value = e.target.value.replace(/\s+/g, '')
+    } else {
+      const input = inputValue.value.replace(/\s+/g, '')
+      if (input.length > 0) {
+        if (!testStarted.value) {
+          testStarted.value = true
+          startTime.value = Date.now()
+        }
+        
+        typedText.value += input
+        currentIndex.value += input.length
+        
+        while (displayText.value[currentIndex.value] === ' ') {
+          currentIndex.value++
+        }
+        
+        inputValue.value = ''
+        
+        if (currentIndex.value >= displayText.value.length) {
+          testComplete.value = true
+          calculateResults()
+        }
       }
     }
   }
@@ -397,7 +421,12 @@ const getDisplayCharacter = (char, index) => {
   if (selectedLanguage.value === 'ja') {
     if (char === ' ') return char
     const actualIndex = displayText.value.slice(0, index).replace(/\s/g, '').length
-    return actualIndex < typedText.value.length ? typedText.value[actualIndex] : char
+    if (actualIndex < typedText.value.length) {
+      return typedText.value[actualIndex]
+    } else if (index === currentIndex.value && isComposing.value) {
+      return inputValue.value || char
+    }
+    return char
   } else {
     return index < currentIndex.value ? typedText.value[index] : char
   }
