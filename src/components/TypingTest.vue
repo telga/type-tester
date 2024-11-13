@@ -127,19 +127,26 @@ const loadNewWords = async () => {
 }
 
 const calculateResults = () => {
-  const timeInMinutes = (Date.now() - startTime.value) / 60000
+  const timeInSeconds = (Date.now() - startTime.value) / 1000
   accuracy.value = calculateAccuracy()
   
   if (selectedLanguage.value === 'en') {
-    const wordsTyped = text.value.split(' ').length
-    const rawWpm = Math.round(wordsTyped / timeInMinutes)
-    // For English: show 0 WPM if accuracy is under 60%
+    // For English: (characters typed / 5) / minutes
+    const totalChars = text.value.length
+    const charactersPerSecond = totalChars / timeInSeconds
+    const rawWpm = Math.round((charactersPerSecond * 60) / 5)
+    // Show 0 WPM if accuracy is under 60%
     wpm.value = accuracy.value < 60 ? 0 : rawWpm
   } else {
-    // For Japanese: show WPM regardless of accuracy
-    const characterCount = text.value.length
-    const effectiveWords = characterCount / 2
-    wpm.value = Math.round(effectiveWords / timeInMinutes)
+    // For Japanese: only count correctly typed characters
+    let correctChars = 0
+    for (let i = 0; i < typedText.value.length; i++) {
+      if (typedText.value[i] === text.value[i]) {
+        correctChars++
+      }
+    }
+    const charactersPerSecond = correctChars / timeInSeconds
+    wpm.value = Math.round((charactersPerSecond * 60) / 5)
   }
 }
 
@@ -240,7 +247,8 @@ const handleCompositionEnd = (e) => {
     currentIndex.value += e.data.length
     inputValue.value = ''
     
-    if (currentIndex.value === text.value.length) {
+    // Check if we've reached or exceeded the target length
+    if (typedText.value.length >= text.value.length) {
       testComplete.value = true
       calculateResults()
     }
@@ -264,7 +272,8 @@ const handleInput = (e) => {
       currentIndex.value += input.length
       inputValue.value = ''
       
-      if (currentIndex.value === text.value.length) {
+      // Check if we've reached or exceeded the target length
+      if (typedText.value.length >= text.value.length) {
         testComplete.value = true
         calculateResults()
       }
