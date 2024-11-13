@@ -1,6 +1,6 @@
 <template>
-  <div class="fixed inset-0 bg-nord0 text-nord4 flex items-center justify-center">
-    <div class="flex flex-col items-center gap-6 max-h-screen py-8">
+  <div class="h-[80vh] flex items-center justify-center">
+    <div class="flex flex-col items-center gap-6 py-8">
       <!-- Word Count Input -->
       <div class="flex items-center gap-2 animate-fade-in">
         <input
@@ -8,6 +8,7 @@
           v-model.number="selectedWordCount"
           @blur="handleWordCountChange"
           @keydown.enter="handleEnterKey"
+          @focus="handleFocus"
           :disabled="testStarted"
           class="w-12 bg-transparent text-center text-nord4 focus:outline-none transition-colors duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           :class="{ 'opacity-50': testStarted }"
@@ -19,14 +20,14 @@
         <Stats :wpm="wpm" :accuracy="accuracy" />
         <span v-if="accuracy < 70" 
               class="text-nord11 text-sm text-center block mt-2 animate-fade-in">
-          invalid: accuracy too low
+          invalid: ur cheating or ur really bad at typing
         </span>
       </div>
       
       <!-- Main typing area -->
       <div class="w-full max-w-2xl px-4">
         <div 
-          class="w-full text-lg leading-relaxed focus:outline-none"
+          class="w-full text-2xl leading-relaxed focus:outline-none"
           @keydown="handleKeyPress"
           tabindex="0"
           ref="textContainer"
@@ -50,8 +51,9 @@
       <!-- Restart button -->
       <button
         @click="resetTest"
-        class="px-6 py-2 bg-nord3 text-nord6 rounded-lg transition-all duration-200 hover:bg-nord2 hover:scale-105 active:scale-95"
-      >
+        @keydown.enter="resetTest"
+        tabindex="0"
+        class="px-6 py-2 bg-nord3 text-nord6 rounded-lg transition-all duration-200 hover:bg-nord2 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-nord8 focus:outline-none">
         restart test
       </button>
     </div>
@@ -63,7 +65,9 @@ import { ref, computed, onMounted } from 'vue'
 import Stats from './Stats.vue'
 import { generateWords } from '../services/wordService'
 
-const selectedWordCount = ref(25)
+// Get saved word count or default to 25
+const savedWordCount = localStorage.getItem('lastWordCount')
+const selectedWordCount = ref(savedWordCount ? parseInt(savedWordCount) : 25)
 const text = ref('')
 const typedText = ref('')
 const currentIndex = ref(0)
@@ -79,6 +83,8 @@ const handleWordCountChange = () => {
   if (selectedWordCount.value < 8) selectedWordCount.value = 8
   if (selectedWordCount.value > 100) selectedWordCount.value = 100
   selectedWordCount.value = Math.round(selectedWordCount.value)
+  // Save to localStorage whenever it changes
+  localStorage.setItem('lastWordCount', selectedWordCount.value.toString())
   resetTest()
 }
 
@@ -107,20 +113,34 @@ const calculateResults = () => {
   wpm.value = accuracy.value >= 70 ? rawWpm : 0
 }
 
+const handleFocus = (e) => {
+  e.target.select()
+}
+
 const handleKeyPress = (e) => {
   if (testComplete.value) return
 
-  if (!testStarted.value) {
+  if (e.key === 'r' && e.ctrlKey) {
+    e.preventDefault()
+    resetTest()
+    return
+  }
+
+  if (e.key === 'Tab') {
+    return
+  }
+
+  if (e.key === text.value[0] && !testStarted.value) {
     testStarted.value = true
     startTime.value = Date.now()
   }
 
-  if (e.key === text.value[currentIndex.value]) {
-    typedText.value += e.key
-    currentIndex.value++
-  } else if (e.key === 'Backspace' && currentIndex.value > 0) {
+  if (e.key === 'Backspace' && currentIndex.value > 0) {
     typedText.value = typedText.value.slice(0, -1)
     currentIndex.value--
+  } else if (e.key.length === 1) {
+    typedText.value += e.key
+    currentIndex.value++
   }
 
   if (currentIndex.value === text.value.length) {
@@ -128,7 +148,9 @@ const handleKeyPress = (e) => {
     calculateResults()
   }
 
-  e.preventDefault()
+  if (e.key !== 'Tab') {
+    e.preventDefault()
+  }
 }
 
 const resetTest = async () => {
@@ -141,6 +163,15 @@ const resetTest = async () => {
   wpm.value = 0
   accuracy.value = 100
   textContainer.value?.focus()
+}
+
+const getDisplayChar = (char, index) => {
+  if (char === ' ' && 
+      index < currentIndex.value && 
+      typedText.value[index] !== char) {
+    return '_'
+  }
+  return char
 }
 
 onMounted(async () => {
@@ -166,7 +197,7 @@ onMounted(async () => {
 }
 
 .animate-cursor {
-  animation: cursor 1s infinite;
+  animation: cursor 0.8s ease infinite;
 }
 
 .animate-slide-up {

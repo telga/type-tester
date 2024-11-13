@@ -1,6 +1,25 @@
 const BASE_URL = 'https://api.datamuse.com/words'
+const JISHO_API = 'https://jisho.org/api/v1/search/words'
 
-export async function generateWords(count) {
+export const generateWords = async (count, language = 'en') => {
+  if (language === 'ja') {
+    try {
+      const response = await fetch(`${JISHO_API}?keyword=%23common`)
+      const data = await response.json()
+      
+      // Filter for words that only contain hiragana
+      const hiraganaWords = data.data
+        .map(item => item.japanese[0].reading)
+        .filter(word => /^[ぁ-んー\s]*$/.test(word))
+        .slice(0, count)
+      
+      return hiraganaWords.join(' ')
+    } catch (error) {
+      console.error('Error fetching Japanese words:', error)
+      return generateWords(count, 'en') // Fallback to English
+    }
+  }
+
   try {
     const words = []
     
