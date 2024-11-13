@@ -3,15 +3,32 @@
     <div class="flex flex-col items-center gap-6 py-8">
       <!-- Add language selector next to word count -->
       <div class="flex items-center gap-4 animate-fade-in">
-        <select
-          v-model="selectedLanguage"
-          @change="handleLanguageChange"
-          :disabled="testStarted"
-          class="bg-transparent text-nord4 focus:outline-none border-none cursor-pointer px-2 py-1 rounded hover:bg-nord1 transition-colors"
-        >
-          <option value="en">English</option>
-          <option value="ja">Hiragana</option>
-        </select>
+        <div class="relative">
+          <button
+            @click="isDropupOpen = !isDropupOpen"
+            :disabled="testStarted"
+            class="bg-nord1 text-nord4 focus:outline-none border-none cursor-pointer px-3 py-1.5 rounded hover:bg-nord2 transition-colors disabled:opacity-50 flex items-center gap-1"
+          >
+            {{ selectedLanguage === 'en' ? 'English' : '日本語' }}
+            <span class="transform rotate-180 text-[16px] pr-1.5 opacity-40 translate-y-[0.5px]">▾</span>
+          </button>
+          
+          <!-- Dropup menu -->
+          <div
+            v-if="isDropupOpen"
+            class="absolute bottom-full left-0 mb-1 bg-nord1 rounded shadow-lg overflow-hidden animate-fade-in"
+          >
+            <button
+              v-for="lang in languages"
+              :key="lang.code"
+              @click="selectLanguage(lang.code)"
+              class="w-full px-4 py-2 text-left text-nord4 hover:bg-nord2 transition-colors whitespace-nowrap"
+              :class="{ 'bg-nord2': selectedLanguage === lang.code }"
+            >
+              {{ lang.label }}
+            </button>
+          </div>
+        </div>
 
         <div class="flex items-center gap-2">
           <!-- Your existing word count input -->
@@ -22,10 +39,10 @@
             @keydown.enter="handleEnterKey"
             @focus="handleFocus"
             :disabled="testStarted"
-            class="w-12 bg-transparent text-center text-nord4 focus:outline-none transition-colors duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            class="w-12 bg-nord1 text-center text-nord4 focus:outline-none focus:bg-nord2 px-2 py-1.5 rounded transition-colors duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             :class="{ 'opacity-50': testStarted }"
           />
-          <span class="text-sm text-nord4 opacity-50">words</span>
+          <span class="text-sm text-nord4 opacity-50">{{ selectedLanguage === 'en' ? 'words' : '言葉' }}</span>
         </div>
       </div>
 
@@ -77,7 +94,7 @@
         @keydown.enter="resetTest"
         tabindex="0"
         class="px-6 py-2 bg-nord3 text-nord6 rounded-lg transition-all duration-200 hover:bg-nord2 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-nord8 focus:outline-none">
-        restart test
+        {{ selectedLanguage === 'en' ? 'restart' : 'リセット' }}
       </button>
     </div>
   </div>
@@ -105,6 +122,12 @@ const wpm = ref(0)
 const accuracy = ref(100)
 
 const selectedLanguage = ref(localStorage.getItem('lastLanguage') || 'en')
+
+const isDropupOpen = ref(false)
+const languages = [
+  { code: 'en', label: 'English' },
+  { code: 'ja', label: '日本語（ひらがな）' }
+]
 
 const handleWordCountChange = () => {
   if (selectedWordCount.value < 8) selectedWordCount.value = 8
@@ -166,7 +189,7 @@ const calculateAccuracy = () => {
 }
 
 const handleFocus = (e) => {
-  e.target.select()
+  e.target.value = ''
 }
 
 const handleKeyPress = (e) => {
@@ -225,8 +248,10 @@ const getDisplayChar = (char, index) => {
   return char
 }
 
-const handleLanguageChange = () => {
-  localStorage.setItem('lastLanguage', selectedLanguage.value)
+const selectLanguage = (langCode) => {
+  selectedLanguage.value = langCode
+  isDropupOpen.value = false
+  localStorage.setItem('lastLanguage', langCode)
   resetTest()
 }
 
@@ -285,6 +310,12 @@ const handleInput = (e) => {
 onMounted(async () => {
   await loadNewWords()
   textContainer.value?.focus()
+  document.addEventListener('click', (e) => {
+    const dropdown = document.querySelector('.relative')
+    if (dropdown && !dropdown.contains(e.target)) {
+      isDropupOpen.value = false
+    }
+  })
 })
 </script>
 
