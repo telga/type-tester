@@ -1,6 +1,4 @@
 const BASE_URL = 'https://api.datamuse.com/words'
-const CORS_PROXY = 'https://api.codetabs.com/v1/proxy?quest='
-const JISHO_SEARCH_BASE = 'https://jisho.org/api/v1/search/words?keyword='
 
 import { JAPANESE_WORDS } from '../data/japaneseWords';
 
