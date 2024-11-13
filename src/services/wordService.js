@@ -1,36 +1,43 @@
 const BASE_URL = 'https://api.datamuse.com/words'
-const JISHO_API = 'https://jisho.org/api/v1/search/words'
+const JISHO_API = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://jisho.org/api/v1/search/words?keyword=%23common')
 
 export const generateWords = async (count, language = 'en') => {
   if (language === 'ja') {
     try {
-      const response = await fetch(`${JISHO_API}?keyword=%23common`)
+      const response = await fetch(JISHO_API)
       const data = await response.json()
       
-      // Filter for words that only contain hiragana
-      const hiraganaWords = data.data
-        .map(item => item.japanese[0].reading)
-        .filter(word => /^[ぁ-んー\s]*$/.test(word))
-        .slice(0, count)
+      // Get unique hiragana words
+      const hiraganaWords = [...new Set(
+        data.data
+          .map(item => item.japanese[0].reading)
+          .filter(word => /^[ぁ-んー\s]*$/.test(word))
+          .filter(word => word.length >= 1 && word.length <= 4) // Shorter words are easier to type
+      )]
       
-      return hiraganaWords.join(' ')
+      // Randomly select count words
+      const selectedWords = []
+      for (let i = 0; i < count; i++) {
+        const randomIndex = Math.floor(Math.random() * hiraganaWords.length)
+        selectedWords.push(hiraganaWords[randomIndex])
+      }
+      
+      return selectedWords.join(' ')
     } catch (error) {
       console.error('Error fetching Japanese words:', error)
-      return generateWords(count, 'en') // Fallback to English
+      return 'Error loading Japanese words. Please try again.'
     }
   }
 
   try {
     const words = []
     
-    // Make parallel requests for better performance
     const requests = Array(count).fill().map(() => {
-      const randomLength = Math.floor(Math.random() * 5) + 3 // Random number 3-7
-      const randomType = Math.random() < 0.33 ? 'rel_jja=good' : // nouns
-                        Math.random() < 0.66 ? 'rel_jjb=word' : // verbs
-                        'ml=action' // adjectives
+      const randomLength = Math.floor(Math.random() * 5) + 3
+      const randomType = Math.random() < 0.33 ? 'rel_jja=good' :
+                        Math.random() < 0.66 ? 'rel_jjb=word' :
+                        'ml=action'
       
-      // Construct URL with parameters
       const params = new URLSearchParams({
         max: '100',
         md: 'f',
@@ -45,28 +52,15 @@ export const generateWords = async (count, language = 'en') => {
       responses.map(response => response.json())
     )
 
-    console.log('API Responses:', jsonResponses) // Debug log
-
-    // Process each response to get a word of the desired length
     const selectedWords = jsonResponses.map(wordList => {
-      const targetLength = Math.floor(Math.random() * 5) + 3 // 3-7
-      console.log('Target length:', targetLength) // Debug log
+      const targetLength = Math.floor(Math.random() * 5) + 3
       
-      // Filter words by length
-      const validWords = wordList.filter(w => {
-        console.log('Checking word:', w.word, 'length:', w.word.length) // Debug log
-        return w.word.length === targetLength
-      })
-
-      console.log('Valid words:', validWords) // Debug log
+      const validWords = wordList.filter(w => w.word.length === targetLength)
 
       if (validWords.length > 0) {
-        const selectedWord = validWords[Math.floor(Math.random() * validWords.length)].word
-        console.log('Selected word:', selectedWord) // Debug log
-        return selectedWord
+        return validWords[Math.floor(Math.random() * validWords.length)].word
       }
       
-      // If no words match the length, try any length between 3-7
       const anyLengthWords = wordList.filter(w => 
         w.word.length >= 3 && w.word.length <= 7
       )
@@ -75,10 +69,9 @@ export const generateWords = async (count, language = 'en') => {
         return anyLengthWords[Math.floor(Math.random() * anyLengthWords.length)].word
       }
       
-      return 'word' // Last resort fallback
+      return 'word'
     })
     
-    console.log('Final words:', selectedWords) // Debug log
     return selectedWords.join(' ')
 
   } catch (error) {

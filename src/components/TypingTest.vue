@@ -1,19 +1,32 @@
 <template>
   <div class="h-[80vh] flex items-center justify-center">
     <div class="flex flex-col items-center gap-6 py-8">
-      <!-- Word Count Input -->
-      <div class="flex items-center gap-2 animate-fade-in">
-        <input
-          type="number"
-          v-model.number="selectedWordCount"
-          @blur="handleWordCountChange"
-          @keydown.enter="handleEnterKey"
-          @focus="handleFocus"
+      <!-- Add language selector next to word count -->
+      <div class="flex items-center gap-4 animate-fade-in">
+        <select
+          v-model="selectedLanguage"
+          @change="handleLanguageChange"
           :disabled="testStarted"
-          class="w-12 bg-transparent text-center text-nord4 focus:outline-none transition-colors duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-          :class="{ 'opacity-50': testStarted }"
-        />
-        <span class="text-sm text-nord4 opacity-50">words</span>
+          class="bg-transparent text-nord4 focus:outline-none border-none cursor-pointer px-2 py-1 rounded hover:bg-nord1 transition-colors"
+        >
+          <option value="en">English</option>
+          <option value="ja">Hiragana</option>
+        </select>
+
+        <div class="flex items-center gap-2">
+          <!-- Your existing word count input -->
+          <input
+            type="number"
+            v-model.number="selectedWordCount"
+            @blur="handleWordCountChange"
+            @keydown.enter="handleEnterKey"
+            @focus="handleFocus"
+            :disabled="testStarted"
+            class="w-12 bg-transparent text-center text-nord4 focus:outline-none transition-colors duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            :class="{ 'opacity-50': testStarted }"
+          />
+          <span class="text-sm text-nord4 opacity-50">words</span>
+        </div>
       </div>
 
       <div v-if="testComplete" class="animate-slide-up">
@@ -79,6 +92,8 @@ const textContainer = ref(null)
 const wpm = ref(0)
 const accuracy = ref(100)
 
+const selectedLanguage = ref(localStorage.getItem('lastLanguage') || 'en')
+
 const handleWordCountChange = () => {
   if (selectedWordCount.value < 8) selectedWordCount.value = 8
   if (selectedWordCount.value > 100) selectedWordCount.value = 100
@@ -96,7 +111,7 @@ const handleEnterKey = (e) => {
 }
 
 const loadNewWords = async () => {
-  text.value = await generateWords(selectedWordCount.value)
+  text.value = await generateWords(selectedWordCount.value, selectedLanguage.value)
 }
 
 const calculateResults = () => {
@@ -172,6 +187,11 @@ const getDisplayChar = (char, index) => {
     return '_'
   }
   return char
+}
+
+const handleLanguageChange = () => {
+  localStorage.setItem('lastLanguage', selectedLanguage.value)
+  resetTest()
 }
 
 onMounted(async () => {
