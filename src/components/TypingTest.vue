@@ -85,15 +85,14 @@
                 'text-nord11 transition-colors duration-150': selectedLanguage === 'ja'
                   ? (getJapaneseCharStatus(index) === 'incorrect')
                   : (index < currentIndex && typedText[index] !== char),
+                'text-nord7': selectedLanguage === 'ja' && isComposing && index >= currentIndex.value && 
+                  (index - currentIndex.value) < inputValue.value.length,
                 'relative cursor-underline': index === currentIndex && !testComplete,
-                'text-nord4': index > currentIndex,
+                'text-nord4': index > currentIndex || 
+                  (selectedLanguage === 'ja' && isComposing && index >= currentIndex.value + inputValue.value.length),
                 'select-none pointer-events-none opacity-50': selectedLanguage === 'ja' && char === ' '
               }"
             >{{ getDisplayCharacter(char, index) }}</span>
-            <span 
-              v-if="selectedLanguage === 'ja' && isComposing" 
-              class="text-nord4"
-            >{{ inputValue }}</span>
           </p>
         </div>
       </div>
@@ -297,16 +296,12 @@ const selectLanguage = (langCode) => {
   resetTest()
 }
 
-const handleCompositionStart = (e) => {
+const handleCompositionStart = () => {
   isComposing.value = true
-  inputValue.value = e.data || ''
 }
 
 const handleCompositionUpdate = (e) => {
-  if (selectedLanguage.value === 'ja') {
-    // Filter out spaces during IME composition
-    inputValue.value = (e.data || '').replace(/\s+/g, '')
-  }
+  inputValue.value = e.data || ''
 }
 
 const handleCompositionEnd = (e) => {
@@ -317,34 +312,34 @@ const handleCompositionEnd = (e) => {
       startTime.value = Date.now()
     }
     
-    // Filter out spaces from the final input
-    const input = (e.data || '').replace(/\s+/g, '')
-    typedText.value += input
+    const input = e.data || ''
+    const actualIndex = currentIndex.value - text.value.slice(0, currentIndex.value).split(' ').length + 1
+    typedText.value = typedText.value.slice(0, actualIndex) + input
     currentIndex.value += input.length
     
-    while (displayText.value[currentIndex.value] === ' ') {
+    // Skip spaces
+    while (text.value[currentIndex.value] === ' ') {
       currentIndex.value++
     }
     
     inputValue.value = ''
     
-    if (currentIndex.value >= displayText.value.length) {
+    if (currentIndex.value >= text.value.length) {
       testComplete.value = true
       calculateResults()
     }
   }
 }
 
-// Update handleInput function
 const handleInput = (e) => {
   if (testComplete.value) return
   
   if (selectedLanguage.value === 'ja') {
     if (isComposing.value) {
-      // During IME composition, filter out spaces
-      inputValue.value = e.target.value.replace(/\s+/g, '')
+      // Just update the preview during composition
+      inputValue.value = e.target.value
     } else {
-      const input = inputValue.value.replace(/\s+/g, '')
+      const input = inputValue.value
       if (input.length > 0) {
         if (!testStarted.value) {
           testStarted.value = true
@@ -354,13 +349,14 @@ const handleInput = (e) => {
         typedText.value += input
         currentIndex.value += input.length
         
-        while (displayText.value[currentIndex.value] === ' ') {
+        // Skip spaces after committing text
+        while (text.value[currentIndex.value] === ' ') {
           currentIndex.value++
         }
         
         inputValue.value = ''
         
-        if (currentIndex.value >= displayText.value.length) {
+        if (currentIndex.value >= text.value.length) {
           testComplete.value = true
           calculateResults()
         }
@@ -416,17 +412,21 @@ const getJapaneseCharStatus = (displayIndex) => {
   return typedText.value[actualIndex] === actualChar ? 'correct' : 'incorrect'
 }
 
-// Add this helper function
+// Update getDisplayCharacter function
 const getDisplayCharacter = (char, index) => {
   if (selectedLanguage.value === 'ja') {
     if (char === ' ') return char
-    const actualIndex = displayText.value.slice(0, index).replace(/\s/g, '').length
-    if (actualIndex < typedText.value.length) {
-      return typedText.value[actualIndex]
-    } else if (index === currentIndex.value && isComposing.value) {
-      return inputValue.value || char
+    
+    // If we're composing, show the IME input in place of the target characters
+    if (isComposing.value && index >= currentIndex.value) {
+      const imeIndex = index - currentIndex.value
+      if (imeIndex < inputValue.value.length) {
+        return inputValue.value[imeIndex]
+      }
     }
-    return char
+    
+    // For already typed characters or remaining target characters
+    return index < currentIndex.value ? typedText.value[index] : char
   } else {
     return index < currentIndex.value ? typedText.value[index] : char
   }
