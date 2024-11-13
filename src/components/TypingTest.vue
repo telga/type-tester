@@ -88,7 +88,7 @@
                 'text-nord4': index > currentIndex,
                 'select-none pointer-events-none opacity-50': selectedLanguage === 'ja' && char === ' '
               }"
-            >{{ char }}</span>
+            >{{ getDisplayCharacter(char, index) }}</span>
           </p>
         </div>
       </div>
@@ -390,6 +390,17 @@ const getJapaneseCharStatus = (displayIndex) => {
   
   const actualChar = text.value.replace(/\s/g, '')[actualIndex]
   return typedText.value[actualIndex] === actualChar ? 'correct' : 'incorrect'
+}
+
+// Add this helper function
+const getDisplayCharacter = (char, index) => {
+  if (selectedLanguage.value === 'ja') {
+    if (char === ' ') return char
+    const actualIndex = displayText.value.slice(0, index).replace(/\s/g, '').length
+    return actualIndex < typedText.value.length ? typedText.value[actualIndex] : char
+  } else {
+    return index < currentIndex.value ? typedText.value[index] : char
+  }
 }
 </script>
 
