@@ -85,11 +85,8 @@
                 'text-nord11 transition-colors duration-150': selectedLanguage === 'ja'
                   ? (getJapaneseCharStatus(index) === 'incorrect')
                   : (index < currentIndex && typedText[index] !== char),
-                'text-nord7': selectedLanguage === 'ja' && isComposing && index >= currentIndex.value && 
-                  (index - currentIndex.value) < inputValue.value.length,
                 'relative cursor-underline': index === currentIndex && !testComplete,
-                'text-nord4': index > currentIndex || 
-                  (selectedLanguage === 'ja' && isComposing && index >= currentIndex.value + inputValue.value.length),
+                'text-nord4': index > currentIndex,
                 'select-none pointer-events-none opacity-50': selectedLanguage === 'ja' && char === ' '
               }"
             >{{ getDisplayCharacter(char, index) }}</span>
@@ -313,18 +310,18 @@ const handleCompositionEnd = (e) => {
     }
     
     const input = e.data || ''
-    const actualIndex = currentIndex.value - text.value.slice(0, currentIndex.value).split(' ').length + 1
-    typedText.value = typedText.value.slice(0, actualIndex) + input
-    currentIndex.value += input.length
+    const currentTextLength = typedText.value.length
+    typedText.value = typedText.value + input
+    currentIndex.value = currentIndex.value + input.length
     
     // Skip spaces
-    while (text.value[currentIndex.value] === ' ') {
+    while (displayText.value[currentIndex.value] === ' ') {
       currentIndex.value++
     }
     
     inputValue.value = ''
     
-    if (currentIndex.value >= text.value.length) {
+    if (currentIndex.value >= displayText.value.length) {
       testComplete.value = true
       calculateResults()
     }
@@ -417,7 +414,13 @@ const getDisplayCharacter = (char, index) => {
   if (selectedLanguage.value === 'ja') {
     if (char === ' ') return char
     
-    // If we're composing, show the IME input in place of the target characters
+    // For already typed characters
+    if (index < currentIndex.value) {
+      const actualIndex = displayText.value.slice(0, index).replace(/\s/g, '').length
+      return typedText.value[actualIndex] || char
+    }
+    
+    // For IME preview
     if (isComposing.value && index >= currentIndex.value) {
       const imeIndex = index - currentIndex.value
       if (imeIndex < inputValue.value.length) {
@@ -425,8 +428,8 @@ const getDisplayCharacter = (char, index) => {
       }
     }
     
-    // For already typed characters or remaining target characters
-    return index < currentIndex.value ? typedText.value[index] : char
+    // For untyped characters
+    return char
   } else {
     return index < currentIndex.value ? typedText.value[index] : char
   }
