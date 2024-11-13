@@ -2,17 +2,6 @@ const BASE_URL = 'https://api.datamuse.com/words'
 const CORS_PROXY = 'https://api.codetabs.com/v1/proxy?quest='
 const JISHO_SEARCH_BASE = 'https://jisho.org/api/v1/search/words?keyword='
 
-// Define fallback words at the top
-const FALLBACK_WORDS = [
-  'たべる', 'のむ', 'よむ', 'かく', 'はなす',
-  'あるく', 'みる', 'きく', 'ねる', 'おきる',
-  'いく', 'くる', 'する', 'やる', 'あそぶ',
-  'あつい', 'さむい', 'たかい', 'ひくい', 'おおきい',
-  'ちいさい', 'むずかしい', 'やさしい', 'おもしろい', 'たのしい',
-  'いぬ', 'ねこ', 'とり', 'さかな', 'うま',
-  'やま', 'かわ', 'うみ', 'そら', 'ほし'
-];
-
 import { JAPANESE_WORDS } from '../data/japaneseWords';
 
 export const generateWords = async (count, language = 'en') => {
@@ -31,9 +20,7 @@ export const generateWords = async (count, language = 'en') => {
       
     } catch (error) {
       console.error('Error selecting Japanese words:', error);
-      // Use verbs as fallback if something goes wrong
-      const shuffled = [...JAPANESE_WORDS.verbs].sort(() => 0.5 - Math.random());
-      return shuffled.slice(0, count).join(' ');
+      return 'Error loading Japanese words. Please try again.';
     }
   }
 
