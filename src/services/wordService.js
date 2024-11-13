@@ -1,31 +1,39 @@
 const BASE_URL = 'https://api.datamuse.com/words'
-const JISHO_API = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://jisho.org/api/v1/search/words?keyword=%23common')
+const CORS_PROXY = 'https://api.codetabs.com/v1/proxy?quest='
+const JISHO_SEARCH_BASE = 'https://jisho.org/api/v1/search/words?keyword='
+
+// Define fallback words at the top
+const FALLBACK_WORDS = [
+  'たべる', 'のむ', 'よむ', 'かく', 'はなす',
+  'あるく', 'みる', 'きく', 'ねる', 'おきる',
+  'いく', 'くる', 'する', 'やる', 'あそぶ',
+  'あつい', 'さむい', 'たかい', 'ひくい', 'おおきい',
+  'ちいさい', 'むずかしい', 'やさしい', 'おもしろい', 'たのしい',
+  'いぬ', 'ねこ', 'とり', 'さかな', 'うま',
+  'やま', 'かわ', 'うみ', 'そら', 'ほし'
+];
+
+import { JAPANESE_WORDS } from '../data/japaneseWords';
 
 export const generateWords = async (count, language = 'en') => {
   if (language === 'ja') {
     try {
-      const response = await fetch(JISHO_API)
-      const data = await response.json()
+      // Flatten all categories into one array
+      const allWords = Object.values(JAPANESE_WORDS).flat();
       
-      // Get unique hiragana words
-      const hiraganaWords = [...new Set(
-        data.data
-          .map(item => item.japanese[0].reading)
-          .filter(word => /^[ぁ-んー\s]*$/.test(word))
-          .filter(word => word.length >= 1 && word.length <= 4) // Shorter words are easier to type
-      )]
+      // Shuffle the array
+      const shuffled = [...allWords].sort(() => 0.5 - Math.random());
       
-      // Randomly select count words
-      const selectedWords = []
-      for (let i = 0; i < count; i++) {
-        const randomIndex = Math.floor(Math.random() * hiraganaWords.length)
-        selectedWords.push(hiraganaWords[randomIndex])
-      }
+      // Take the required number of words
+      const selectedWords = shuffled.slice(0, count);
       
-      return selectedWords.join(' ')
+      return selectedWords.join(' ');
+      
     } catch (error) {
-      console.error('Error fetching Japanese words:', error)
-      return 'Error loading Japanese words. Please try again.'
+      console.error('Error selecting Japanese words:', error);
+      // Use verbs as fallback if something goes wrong
+      const shuffled = [...JAPANESE_WORDS.verbs].sort(() => 0.5 - Math.random());
+      return shuffled.slice(0, count).join(' ');
     }
   }
 

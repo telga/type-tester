@@ -71,7 +71,6 @@
             @compositionupdate="handleCompositionUpdate"
             @compositionend="handleCompositionEnd"
             class="absolute top-0 left-0 h-full w-full cursor-default bg-transparent text-transparent outline-none focus:outline-none focus:ring-0"
-            :disabled="testComplete"
           />
           
           <p class="font-mono text-center max-h-[35vh] overflow-y-auto">
@@ -217,7 +216,17 @@ const handleFocus = (e) => {
 }
 
 const handleKeyPress = (e) => {
-  if (testComplete.value) return
+  if (testComplete.value) {
+    // Only allow Enter and Ctrl+R when test is complete
+    if (e.key === 'Enter' || (e.key === 'r' && e.ctrlKey)) {
+      e.preventDefault()
+      resetTest()
+    }
+    // Clear IME input and prevent all other keypresses
+    inputValue.value = ''
+    e.preventDefault()
+    return
+  }
 
   if (e.key === 'r' && e.ctrlKey) {
     e.preventDefault()
@@ -294,14 +303,29 @@ const selectLanguage = (langCode) => {
 }
 
 const handleCompositionStart = () => {
+  // Don't start composition if test is complete
+  if (testComplete.value) {
+    inputValue.value = ''
+    return
+  }
   isComposing.value = true
 }
 
 const handleCompositionUpdate = (e) => {
+  // Don't update composition if test is complete
+  if (testComplete.value) {
+    inputValue.value = ''
+    return
+  }
   inputValue.value = e.data || ''
 }
 
 const handleCompositionEnd = (e) => {
+  // Don't process composition if test is complete
+  if (testComplete.value) {
+    inputValue.value = ''
+    return
+  }
   isComposing.value = false
   if (selectedLanguage.value === 'ja') {
     if (!testStarted.value) {
